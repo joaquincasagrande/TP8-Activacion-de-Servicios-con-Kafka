@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/apps/activation-api"
+  },
+  "include": ["src/**/*", "../../libs/contracts/src/**/*"]
+}

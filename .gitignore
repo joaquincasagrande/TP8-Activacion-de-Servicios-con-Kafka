@@ -13,6 +13,7 @@ build/
 coverage/
 *.tsbuildinfo
 out/
+.vite/
 
 # ==========================================
 # Logs y depuración

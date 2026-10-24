@@ -61,7 +61,7 @@ flowchart TD
 
 ## 2. Desglose Secuencial de Tareas (Roadmap Fases 1 y 2)
 
-### Etapa 0: Infraestructura Base y Contratos (`feat/phase1-infra-contracts`)
+### Etapa 0: Infraestructura Base y Contratos (`main`)
 - [x] **Paso 0.1:** Crear `plan.md` con arquitectura, roadmap y bitácora viva.
 - [x] **Paso 0.2:** Configurar `docker-compose.yml` con:
   - `kafka` (Apache Kafka en modo KRaft sin ZooKeeper, doble listener `localhost:9092` para host y `kafka:29092` para red interna Docker).
@@ -71,58 +71,58 @@ flowchart TD
   - `mailhog` (Servidor SMTP en `1025` e interfaz web en `8025`).
 - [x] **Paso 0.3:** Inicializar el monorepo con `pnpm-workspace.yaml`, `package.json` raíz, `tsconfig.base.json` y `.env.example`.
 - [x] **Paso 0.4:** Implementar `libs/contracts` con el sobre estándar `EventEnvelope<T>`, constructores de eventos, tipos de estado (`PENDING`, `IN_PROGRESS`, `ACTIVE`, `FAILED`), modos de fallo (`none`, `billing`, `provisioning`), nombres de tópicos y grupos de consumidores.
-- [ ] **Punto de Control Git #1:** Validar `docker compose up -d` y hacer commit en rama `feat/phase1-infra-contracts`.
+- [x] **Punto de Control Git #1:** Validar `docker compose up -d` y hacer commit inicial en `main`.
 
 ---
 
-### Fase 1: Camino Feliz en Consola (`feat/phase1-core-saga`)
+### Fase 1: Camino Feliz en Consola (`feature/microservices`)
 **Objetivo:** Cumplir **RF-01 a RF-05**, **RNF-01**, **RNF-02**, **RNF-07**. Verificar el flujo completo del camino feliz por consola y Kafka UI.
 
-- [ ] **Paso 1.1 — `apps/activation-api` (Base + Agregador Camino Feliz):**
+- [x] **Paso 1.1 — `apps/activation-api` (Base + Agregador Camino Feliz):**
   - Esquema Mongoose `Activation` (`_id = activationId`, `customerId`, `planId`, `channel`, `status`, `simulateFailure`, `steps: { billing, provisioning }`, `history`).
   - `POST /activations`: guarda documento en estado `PENDING`, registra `ActivationRequested` en `history`, publica en `activation.requested` usando `customerId` como clave de partición y responde inmediatamente `HTTP 202 Accepted` con `{ activationId, status: 'PENDING' }`.
   - Consumidores `@EventPattern('billing.events')` y `@EventPattern('provisioning.events')`:
     - Actualizan el paso correspondiente (`steps.billing` o `steps.provisioning`) y anexan el evento a `history`.
     - Si es el primer resultado recibido y el estado es `PENDING`, transiciona a `IN_PROGRESS`.
     - Si ambos pasos están en `OK`, transiciona a `ACTIVE` y publica `ActivationCompleted` en `activation.events` (con clave `customerId`).
-- [ ] **Paso 1.2 — `apps/billing-service` (Creación de Cuenta):**
+- [x] **Paso 1.2 — `apps/billing-service` (Creación de Cuenta):**
   - Esquema Mongoose `BillingAccount` (`activationId` único, `customerId`, `planId`, `status: 'CREATED' | 'CANCELLED'`).
   - Consumidor `@EventPattern('activation.requested')` con grupo `billing-svc`:
     - Si `simulateFailure === 'none'` (o distinto de `'billing'`), crea la cuenta con estado `CREATED` y publica `BillingAccountCreated` en `billing.events`.
-- [ ] **Paso 1.3 — `apps/provisioning-service` (Aprovisionamiento con Retardo):**
+- [x] **Paso 1.3 — `apps/provisioning-service` (Aprovisionamiento con Retardo):**
   - Esquema Mongoose `ProvisioningOrder` (`activationId` único, `customerId`, `planId`, `status: 'COMPLETED' | 'FAILED'`).
   - Consumidor `@EventPattern('activation.requested')` con grupo `provisioning-svc`:
     - Aplica retardo simulado de 1 a 3 segundos (`1000ms - 3000ms`).
     - Guarda orden en `provisioning_orders` y publica `ProvisioningCompleted` en `provisioning.events`.
-- [ ] **Punto de Control Git #2:** Probar `POST /activations` con `simulateFailure: "none"`, verificar logs en paralelo y evento `ActivationCompleted` en Kafka UI. Commit en `feat/phase1-core-saga`.
+- [x] **Punto de Control Git #2:** Probar `POST /activations` con `simulateFailure: "none"`, verificar logs en paralelo y evento `ActivationCompleted` en Kafka UI.
 
 ---
 
-### Fase 2: WebSockets, Inyección de Fallos, Compensación y Notificaciones (`feat/phase2-compensation-ws-notifications`)
+### Fase 2: WebSockets, Inyección de Fallos, Compensación y Notificaciones (`feature/microservices`)
 **Objetivo:** Cumplir **RF-06 a RF-09** (y **RF-10** base con `crm-analytics-service`). Dejar listos los Escenarios 1 y 2 de punta a punta para conectar con el Front-end.
 
-- [ ] **Paso 2.1 — Consulta y Tiempo Real en `apps/activation-api` (RF-08, RF-09):**
+- [x] **Paso 2.1 — Consulta y Tiempo Real en `apps/activation-api` (RF-08, RF-09):**
   - Endpoint `GET /activations/:id` que retorna el documento completo de la activación con su estado actual, `steps` y `history`.
   - `@WebSocketGateway({ cors: { origin: '*' } })` con Socket.IO que emite en vivo cada cambio de estado y evento (`activation.updated` / suscripción por `activationId` y broadcast general para la Demo UI).
-- [ ] **Paso 2.2 — Inyección de Fallos y Coordinación de Fallos en Agregador (RF-06):**
+- [x] **Paso 2.2 — Inyección de Fallos y Coordinación de Fallos en Agregador (RF-06):**
   - En `billing-service`: si `simulateFailure === 'billing'`, publica `BillingFailed` en `billing.events`.
   - En `provisioning-service`: si `simulateFailure === 'provisioning'`, tras el delay de 1-3s guarda orden fallida y publica `ProvisioningFailed` en `provisioning.events`.
   - En `activation-api`: si recibe `BillingFailed` o `ProvisioningFailed`:
     - Si la activación no estaba ya en `FAILED`, pasa el estado a `FAILED` y publica inmediatamente `ActivationFailed` en `activation.events`.
     - Si llegan eventos posteriores para una activación ya `FAILED` (ej. `BillingAccountCreated` tardío o `BillingAccountCancelled`), solo los agrega a `history` y los notifica por WebSocket sin cambiar el estado `FAILED`.
-- [ ] **Paso 2.3 — Compensación Saga en `apps/billing-service` + Caso Borde (RF-06):**
+- [x] **Paso 2.3 — Compensación Saga en `apps/billing-service` + Caso Borde (RF-06):**
   - `billing-service` escucha `@EventPattern('activation.events')` en el grupo `billing-svc`.
   - Al recibir `ActivationFailed`:
     - Si la cuenta ya existe con estado `CREATED`, la actualiza a `CANCELLED` y publica `BillingAccountCancelled` en `billing.events`.
     - **Resolución del Caso Borde (Carrera asíncrona):** Si `ActivationFailed` llega *antes* de que `billing-service` procese `ActivationRequested`, registra un marcador/registro con estado `CANCELLED` para ese `activationId`. Cuando luego llegue `ActivationRequested`, detecta que la activación ya falló, evita dejar la cuenta activa y asegura la emisión de `BillingAccountCancelled`.
-- [ ] **Paso 2.4 — `apps/notification-service` con Mailhog (RF-07):**
+- [x] **Paso 2.4 — `apps/notification-service` con Mailhog (RF-07):**
   - Consumidor `@EventPattern('activation.events')` en el grupo `notification-svc`.
   - Con `ActivationCompleted`: envía email HTML/texto de bienvenida vía `nodemailer` al SMTP de Mailhog (`localhost:1025`) y persiste en colección `notifications`.
   - Con `ActivationFailed`: envía email de notificación de fallo de activación a Mailhog y persiste en `notifications`.
-- [ ] **Paso 2.5 — `apps/crm-analytics-service` (Auditoría Pasiva - RF-10):**
+- [x] **Paso 2.5 — `apps/crm-analytics-service` (Auditoría Pasiva - RF-10):**
   - Se suscribe con el grupo `crm-analytics` a los 4 tópicos (`activation.requested`, `billing.events`, `provisioning.events`, `activation.events`).
   - Almacena cada sobre íntegro en la colección `event_log` (con índice único en `eventId` e índice en `correlationId`).
-- [ ] **Punto de Control Git #3:** Validar Escenario 1 (Camino Feliz + Email Bienvenida + WS) y Escenario 2 (Fallo en Provisioning + Compensación `BillingAccountCancelled` + Email Error + WS). Commit en `feat/phase2-compensation-ws-notifications`.
+- [x] **Punto de Control Git #3:** Validar Escenario 1 (Camino Feliz + Email Bienvenida + WS) y Escenario 2 (Fallo en Provisioning + Compensación `BillingAccountCancelled` + Email Error + WS). Commit en `feature/microservices`.
 
 ---
 
@@ -146,3 +146,42 @@ flowchart TD
      - *Solución:* Agregamos `.gitattributes` forzando `eol=lf` en archivos `.sh` y ejecutamos el script en `kafka-init` sanitizando retornos de carro (`tr -d '\r'`) antes de pasarlo a `sh`.
   4. **Diseño de `libs/contracts` y Deserialización Defensiva (`parseEventEnvelope`):**
      - Se centralizan todos los nombres de tópicos (`KAFKA_TOPICS`), grupos de consumo (`CONSUMER_GROUPS`), tipos de eventos (`EVENT_TYPES`), estados de activación (`ACTIVATION_STATUS`) y funciones utilitarias (`createEventEnvelope`, `toKafkaMessage`, `parseEventEnvelope`) para asegurar que el particionado por `customerId` y la lectura de mensajes en `@EventPattern` sean uniformes en los 5 microservicios.
+
+### Registro #2 — Construcción de los 5 Microservicios NestJS (`feature/microservices`)
+- **Estado:** ✅ Código de Fase 1 y Fase 2 implementado
+- **Archivos Generados:**
+  - `apps/activation-api`: `package.json`, `tsconfig.json`, `src/main.ts`, `src/app.module.ts`, `src/activations.controller.ts`, `src/activations.service.ts`, `src/activations.gateway.ts`, `src/dto/create-activation.dto.ts`, `src/schemas/activation.schema.ts`
+  - `apps/billing-service`: `package.json`, `tsconfig.json`, `src/main.ts`, `src/app.module.ts`, `src/billing.controller.ts`, `src/billing.service.ts`, `src/schemas/billing-account.schema.ts`
+  - `apps/provisioning-service`: `package.json`, `tsconfig.json`, `src/main.ts`, `src/app.module.ts`, `src/provisioning.controller.ts`, `src/provisioning.service.ts`, `src/schemas/provisioning-order.schema.ts`
+  - `apps/notification-service`: `package.json`, `tsconfig.json`, `src/main.ts`, `src/app.module.ts`, `src/notification.controller.ts`, `src/notification.service.ts`, `src/schemas/notification.schema.ts`
+  - `apps/crm-analytics-service`: `package.json`, `tsconfig.json`, `src/main.ts`, `src/app.module.ts`, `src/crm.controller.ts`, `src/crm.service.ts`, `src/schemas/event-log.schema.ts`
+- **Decisiones Arquitectónicas Tomadas:**
+  1. **Actualizaciones Atómicas en el Agregador (`activation-api`):**
+     - Como `billing-service` y `provisioning-service` procesan en paralelo, ambos pueden publicar sus resultados casi simultáneamente. Se utilizó `findOneAndUpdate` atómico con `$set` y `$push` en MongoDB junto con una guardia de estado (`status: { $nin: ['ACTIVE', 'FAILED'] }`) para garantizar que no existan *Lost Updates* y que `ActivationCompleted` o `ActivationFailed` se emita exactamente una vez.
+  2. **Manejo del Caso Borde en Compensación (`billing-service`):**
+     - Si un fallo en aprovisionamiento ocurre antes de que `billing-service` termine de procesar `ActivationRequested`, `billing-service` registra un marcador preventivo con estado `CANCELLED` al recibir `ActivationFailed`. Cuando luego procesa `ActivationRequested`, detecta la marca y emite directamente `BillingAccountCancelled`.
+  3. **Idempotencia en Notificaciones (`notification-service`) y Auditoría (`crm-analytics-service`):**
+     - `notifications` cuenta con índice único compuesto `{ activationId: 1, eventType: 1 }` para evitar enviar correos duplicados en Mailhog.
+     - `event_log` cuenta con índice único en `eventId` y usa `updateOne(..., { $setOnInsert }, { upsert: true })` para registrar cada evento una única vez.
+  4. **Resolución de Error TS2742 en `activation-api` con `pnpm` y Mongoose `.lean()`:**
+     - *Problema encontrado:* Al compilar con `pnpm build` (`declaration: true`), TypeScript arrojó `error TS2742: The inferred type of 'getActivationById' cannot be named without a reference to '.pnpm/mongodb@.../node_modules/mongodb'` debido al aislamiento de tipos de `pnpm` en retornos inferidos de `.lean()`.
+     - *Solución:* Se agregaron tipos de retorno explícitos (`Promise<Record<string, any>>`) en `ActivationsService` y `ActivationsController`, y se añadió `onlyBuiltDependencies: ["@nestjs/core"]` en `package.json`.
+
+### Registro #3 — Validación de Escenarios 1 y 2 en Postman y Consola
+- **Estado:** ✅ Validación de integración punta a punta completada
+- **Resultados de las Pruebas:**
+  1. **Escenario 1 (Camino Feliz - `act-aff8f24e`):**
+     - `POST /activations` con `simulateFailure: "none"` respondió `202 Accepted` en estado `PENDING`.
+     - `billing-service` respondió en 23ms (`BillingAccountCreated`).
+     - `provisioning-service` tardó 2.3s (`durationMs: 2313`) y emitió `ProvisioningCompleted`.
+     - El agregador transitó a `ACTIVE` y emitió `ActivationCompleted`.
+     - `notification-service` envió email de bienvenida visible en Mailhog (`c101@cliente.local`).
+     - Consulta `GET /activations/act-aff8f24e` retornó `200 OK` con el historial de 4 eventos y ambos pasos en `OK`.
+  2. **Escenario 2 (Fallo Forzado y Compensación Saga - `act-1306e2da`):**
+     - `POST /activations` con `simulateFailure: "provisioning"` respondió `202 Accepted`.
+     - `billing-service` creó la cuenta preventivamente (`BillingAccountCreated`).
+     - `provisioning-service` falló a los 1.2s (`ProvisioningFailed`) con razón `"Fallo técnico simulado en aprovisionamiento de red/línea"`.
+     - `activation-api` marcó estado `FAILED` y publicó `ActivationFailed` a `activation.events`.
+     - `billing-service` consumió `ActivationFailed` y ejecutó la acción compensatoria: anuló la cuenta en MongoDB (`status: 'CANCELLED'`) y publicó `BillingAccountCancelled`.
+     - `notification-service` envió email de aviso de fallo y anulación de cargos a Mailhog (`c200@cliente.local`).
+     - Consulta `GET /activations/act-1306e2da` confirmó `steps.billing.status: "CANCELLED"` y `steps.provisioning.status: "FAILED"` con 5 eventos en el historial.

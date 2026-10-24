@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/apps/billing-service"
+  },
+  "include": ["src/**/*", "../../libs/contracts/src/**/*"]
+}

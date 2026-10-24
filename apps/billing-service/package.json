@@ -1,0 +1,13 @@
+{
+  "name": "billing-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node ../../dist/apps/billing-service/apps/billing-service/src/main.js",
+    "start:dev": "ts-node -r tsconfig-paths/register src/main.ts"
+  },
+  "dependencies": {
+    "@app/contracts": "workspace:*"
+  }
+}
