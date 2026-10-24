@@ -1,0 +1,11 @@
+{
+  "name": "activation-poc",
+  "private": true,
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "dev:notification": "pnpm --filter notification-service start:dev",
+    "dev:crm": "pnpm --filter crm-analytics-service start:dev",
+    "dev:ui": "pnpm --filter demo-ui dev"
+  }
+}

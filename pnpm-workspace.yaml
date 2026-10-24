@@ -1,0 +1,6 @@
+packages:
+  - 'apps/*'
+  - 'libs/*'
+allowBuilds:
+  '@parcel/watcher': false
+  unrs-resolver: false
