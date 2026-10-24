@@ -1,7 +1,3 @@
-# TP8-Activacion-de-Servicios-con-Kafka
-Pertenece a la materia de 4° Año, "Sistemas Distribuidos".
-
-
 # POC: Activación de Servicios con Kafka y NestJS
 
 Esta Prueba de Concepto (POC) demuestra la orquestación descentralizada (coreografía) de la activación de un servicio utilizando una arquitectura orientada a eventos. Ningún microservicio se comunica directamente con otro mediante HTTP; toda la coordinación se realiza a través de Apache Kafka.
