@@ -185,3 +185,14 @@ flowchart TD
      - `billing-service` consumió `ActivationFailed` y ejecutó la acción compensatoria: anuló la cuenta en MongoDB (`status: 'CANCELLED'`) y publicó `BillingAccountCancelled`.
      - `notification-service` envió email de aviso de fallo y anulación de cargos a Mailhog (`c200@cliente.local`).
      - Consulta `GET /activations/act-1306e2da` confirmó `steps.billing.status: "CANCELLED"` y `steps.provisioning.status: "FAILED"` con 5 eventos en el historial.
+
+### Registro #4 — Integración y Conexión en Tiempo Real de `apps/demo-ui`
+- **Estado:** ✅ Frontend React + Vite + Socket.IO conectado al Backend y compilado
+- **Problemas Detectados y Resueltos al Integrar `demo-ui`:**
+  1. **Reemplazo de Mock Local (`setTimeout`) por Integración Real REST + WebSocket:**
+     - *Problema:* El archivo `App.tsx` original simulaba eventos en memoria con `setTimeout` sin invocar `POST /activations` ni conectarse a Socket.IO.
+     - *Solución:* Se conectó `socket.io-client` a `http://localhost:3000` escuchando `activation.event` y `activation.updated`, y se enlazaron los 3 botones de escenario con `fetch('http://localhost:3000/activations', { method: 'POST' })` enviando `simulateFailure: 'none' | 'billing' | 'provisioning'`.
+  2. **Soporte Visual de Compensación Saga y Estado de Pasos:**
+     - Se añadió visualización del estado en vivo de `Billing` (`PENDING` / `OK` / `FAILED` / `CANCELLED`), `Provisioning` (`PENDING` / `OK` / `FAILED`) y tarjetas ámbar para el evento de compensación `BillingAccountCancelled`.
+  3. **Alineación de Dependencias y Scripts en el Workspace:**
+     - Se normalizaron las versiones de `react`, `vite` y `typescript` en `apps/demo-ui/package.json`, se agregó `"start:dev": "vite --port 5173"` y se configuró `onlyBuiltDependencies` en `pnpm-workspace.yaml`.
